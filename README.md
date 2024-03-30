@@ -11,11 +11,12 @@ Set the PATH dir and "mark" setting before run the `main.py`.
 Note that we obtained the optimal thresholds from the development set and wrote it into `thresholds.csv`.
 
 ## Citation
-'''
+
+```
 @article{liu2024fantastic,
   title={Fantastic Semantics and Where to Find Them: Investigating Which Layers of Generative LLMs Reflect Lexical Semantics},
   author={Liu, Zhu and Kong, Cunliang and Liu, Ying and Sun, Maosong},
   journal={arXiv preprint arXiv:2403.01509},
   year={2024}
 }
-'''
+```
