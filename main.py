@@ -44,7 +44,7 @@ def extract_sentence(txt_path, gold_path, mark, prev=0,pos=None):
         sents_list_1 = df['sent1'].tolist()
         sents_list_2 = df['sent2'].tolist()
         inx_list = df['index'].tolist()
-    elif mark == "prompt":
+    elif mark == "prompt1":
         target_list = df['target']
         sents_list_1 = ["The \"%s\" in this sentence \"%s\" means in one word : \"" % (i,j) for (i,j) in zip(target_list, df['sent1'].tolist())]
         sents_list_2 = ["The \"%s\" in this sentence:\"%s\" means in one word : \"" % (i,j) for (i,j) in zip(target_list, df['sent2'].tolist())]
@@ -86,7 +86,7 @@ def extract_sentence_raw(csv_path, mark):
     # inx_list = [str(i)+"-"+str(j) for i,j in zip(inx1_list, inx2_list)]
     inx_list = df['inx'].tolist()
 
-    if mark == "prompt":
+    if mark == "prompt1":
         sents_list_1 = ["The \"%s\" in this sentence: \"%s\" means in one word : \"" % (i,j) for (i,j) in zip(df['word'], sents_list_1)]
         sents_list_2 = ["The \"%s\" in this sentence: \"%s\" means in one word : \"" % (i,j) for (i,j) in zip(df['word'], sents_list_2)]
         inx_list = ["%d-%d"%(len(i.split())-1, len(j.split())-1) for i,j in zip(sents_list_1, sents_list_2) ]
@@ -98,6 +98,11 @@ def extract_sentence_raw(csv_path, mark):
 
     elif mark == "repeat":
         inx_list = [str(len(s1.split())+int(ix.split("-")[0]))+"-"+str(len(s2.split())+int(ix.split("-")[1])) for s1,s2,ix in zip(sents_list_1,sents_list_2,inx_list)]
+        sents_list_1 = ["%s %s" % (i,i) for i in sents_list_1]
+        sents_list_2 = ["%s %s" % (i,i) for i in sents_list_2]
+
+    elif mark == "repeat_prev":
+        inx_list = [str(len(s1.split())+int(ix.split("-")[0])-1)+"-"+str(len(s2.split())+int(ix.split("-")[1])-1) for s1,s2,ix in zip(sents_list_1,sents_list_2,inx_list)]
         sents_list_1 = ["%s %s" % (i,i) for i in sents_list_1]
         sents_list_2 = ["%s %s" % (i,i) for i in sents_list_2]
 
@@ -146,25 +151,31 @@ def anisotropy_removal(embedding):
 #%%
 if __name__ == "__main__":
     root = "/home/liuzhu/"#"YOUR_ROOT_DIR_PATH"
-    mode = "EVAL" # or TEST 
+    mode = "TEST" # or TEST arg
+    aniso = True # arg
     if mode == "EVAL":
         txt_path = root+"LLM_LexSem/data/dev/dev.data.txt"
         gold_path = root+"LLM_LexSem/data/dev/dev.gold.txt"
     else:
         txt_path = root+"LLM_LexSem/data/test/test.data.txt"
         gold_path = root+"LLM_LexSem/data/test/test.gold.txt"
-    if os.path.exists(root+"LLM_LexSem/thresholds_ori.csv"):
-        thresholds = pd.read_csv(root+"LLM_LexSem/thresholds_ori.csv", delimiter=" ") # obtained by a validate set
+        acc_save_path = root + "LLM_LexSem/output/test_acc.csv" if aniso else \
+                        root + "LLM_LexSem/output/test_acc_no.csv" 
+    threshold_path = root+"LLM_LexSem/thresholds.csv" if aniso else \
+                     root+"LLM_LexSem/thresholds_no.csv"
+    if os.path.exists(threshold_path):
+        thresholds = pd.read_csv(threshold_path, delimiter=" ") # obtained by a validate set
     else:
         thresholds = pd.DataFrame()
     raw_path = root+"LLM_LexSem/data/RAW/raw-c_inx.csv"
-    mark = "base" # args
+    mark = "repeat" # args [repeat, repeat_prev, prompt1, prompt2]
     dataset = "WiC" # args
+    pos = None # args
     tokenizer = LlamaTokenizer.from_pretrained("/data61/liuzhu/LLM/llama-main/llama-2-7b-hf")
     tokenizer.pad_token = '[PAD]'
 
     if dataset == "WiC":
-        sents_list_1, sents_list_2, GT_list, inx_list = extract_sentence(txt_path, gold_path, mark, pos="V")
+        sents_list_1, sents_list_2, GT_list, inx_list = extract_sentence(txt_path, gold_path, mark, prev=0, pos=pos)
     else:
         sents_list_1, sents_list_2, GT_list, inx_list = extract_sentence_raw(raw_path, mark)
     print(sents_list_1[0], sents_list_2[0], GT_list[0], inx_list[0])
@@ -174,7 +185,7 @@ if __name__ == "__main__":
     batch_list_2, tar_inx_list_2 = get_batch_data(sents_list_2, inx_list_2, batch_size=30)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # model = LlamaForCausalLM.from_pretrained("/data61/liuzhu/LLM/llama-main/llama-2-7b-hf").half().to(device)
+    model = LlamaForCausalLM.from_pretrained("/data61/liuzhu/LLM/llama-main/llama-2-7b-hf").half().to(device)
 
     data_pred_layers = {}
     data_sim_layers = {}
@@ -183,11 +194,13 @@ if __name__ == "__main__":
             batch_rep_1 = get_layer_representations(model, batch_1.to(device), tar_inx_1)
             batch_rep_2 = get_layer_representations(model, batch_2.to(device), tar_inx_2)
 
-            for i in range(1,33):
-                # batch_sim = torch.nn.functional.cosine_similarity( anisotropy_removal(batch_rep_1[:,i]), anisotropy_removal(batch_rep_2[:,i]) ).cpu()
-                batch_sim = torch.nn.functional.cosine_similarity( batch_rep_1[:,i], batch_rep_2[:,i] ).cpu()
+            for i in range(33):
+                if aniso:
+                    batch_sim = torch.nn.functional.cosine_similarity( anisotropy_removal(batch_rep_1[:,i]), anisotropy_removal(batch_rep_2[:,i]) ).cpu()
+                else:
+                    batch_sim = torch.nn.functional.cosine_similarity( batch_rep_1[:,i], batch_rep_2[:,i] ).cpu()
                 if mode == "TEST":
-                    batch_pred = (batch_sim > thresholds.at[i-1, mark]).int().tolist()
+                    batch_pred = (batch_sim > thresholds.at[i, mark]).int().tolist()
                     if i in data_pred_layers:
                         data_pred_layers[i] += batch_pred
                         data_sim_layers[i] += batch_sim.tolist()
@@ -208,9 +221,17 @@ if __name__ == "__main__":
         if dataset == "WiC":
             acc_layers = [evaluation(pred, GT_list) for _, pred in data_pred_layers.items()]
             print(acc_layers)
-            print("The best layer: %d with acc: %.2f" % (np.argmax(acc_layers), np.max(acc_layers)))
-            plt.title(mark)
+            print("The best layer: %d with acc: %.3f" % (np.argmax(acc_layers), np.max(acc_layers)))
+            plt.title(mark)#'repeat_prev')#)
             plt.plot(acc_layers)
+            if os.path.exists(acc_save_path):
+                df_acc = pd.read_csv(acc_save_path)
+            else:
+                df_acc = pd.DataFrame()
+                df_acc["Index"] = range(len(acc_layers))
+            df_acc[mark] = acc_layers#mark
+            df_acc.to_csv(acc_save_path, index=False)
+
         else: # RAW
             corr_layers = [evaluation(sim, GT_list, type="corr") for _, sim in data_sim_layers.items()]
             print(np.argmax([round(i*100,1) for i in corr_layers]))
@@ -226,7 +247,8 @@ if __name__ == "__main__":
         plt.plot(best_th_layers)
         for ix,(th,acc) in enumerate(zip(best_th_layers, best_acc_layers)):
             print("The best accuracy: %.2f\tthreshold: %.2f\tlayer: %d" % (acc,th,ix))
+        thresholds['Index'] = range(len(best_th_layers))
         thresholds[mark] = best_th_layers
-        thresholds.to_csv(root+"LLM_LexSem/thresholds_no.csv", sep=" ", index=False)
+        thresholds.to_csv(root+"LLM_LexSem/thresholds.csv", sep=" ", index=False)
 
 # %%
