@@ -18,15 +18,16 @@ def draw_acc_all(acc_scores_all, labels):
     plt.legend()
     plt.xlabel("Layer Index")
     plt.ylabel("Accuracy (%)")
-    plt.savefig("output/ACL_figures/layer_acc.pdf")
+    plt.savefig("output/ACL_figures/layer_prediction.pdf")
 
 if __name__ == "__main__":
     acc_path = "output/test_acc.csv"
-    marks = ['base', 'repeat'] # Fig2: ['prompt2', 'repeat', 'repeat_prev'] # Fig1: 
+    marks = ['prompt2', 'repeat', 'repeat_prev'] # Fig1: ['base', 'repeat'] # Fig2: 
     df = pd.read_csv(acc_path)
     acc_scores_all = [df[i].to_list() for i in marks]
+    marks[0] = 'prompt'
 
-    # '''For Fig2 only
+    '''For Fig2 only
     # get BERT scores
     bert_path = "output/bert_comp.txt"
     mark = "BERT_large"
@@ -34,6 +35,6 @@ if __name__ == "__main__":
     acc_Bert = df_Bert['bert ACC'].to_list()[:25]
     marks.append(mark)
     acc_scores_all.append(acc_Bert)
-    # '''
+    '''
 
     draw_acc_all(acc_scores_all, marks)
