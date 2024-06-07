@@ -7,7 +7,6 @@ import os
 import numpy as np
 import pandas as pd
 import torch
-from matplotlib import pyplot as plt
 from tqdm import tqdm
 from transformers import LlamaForCausalLM, LlamaTokenizer
 
@@ -23,7 +22,7 @@ def parse_args():
     parser.add_argument('--txt_path_dev', type=str, default="data/dev/dev.data.txt")
     parser.add_argument('--gold_path_dev', type=str, default="data/dev/dev.gold.txt")
     parser.add_argument('--acc_save_path', type=str, default='output/test_acc.csv')
-    parser.add_argument('--threshold_path', default="data/test_thresholds.csv")
+    parser.add_argument('--threshold_path', default="data/thresholds.csv")
 
     parser.add_argument('--mark', choices=['repeat', 'repeat_prev', 'prompt1', 'prompt2'], default='repeat')
     parser.add_argument('--NO_aniso', action='store_true')
