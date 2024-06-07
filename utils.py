@@ -115,7 +115,7 @@ def get_batch_data(tokenizer, sents_list, inx_list, batch_size=50, prompt=None):
             break
         sent = sents_list[i*batch_size:min(len(sents_list),(i+1)*batch_size)]
         inx = inx_list[i*batch_size:min(len(sents_list),(i+1)*batch_size)]
-        tar_inx = [SentInx2TokInx(s,ix) for s,ix in zip(sent, inx)]
+        tar_inx = [SentInx2TokInx(tokenizer, s, ix) for s,ix in zip(sent, inx)]
         encoded_sentence = tokenizer(sent, return_tensors="pt", padding=True)
         batch_list.append(encoded_sentence)
         tar_inx_list.append(tar_inx)
